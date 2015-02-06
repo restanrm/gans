@@ -34,9 +34,21 @@ func worker(inputScan chan Scan) {
 }
 */
 
- type P struct {
-	 M, N int64
- }
+func listenGansScan(){
+	log.Print("Waiting for incomming connection")
+	ln, err := net.Listen("tcp", "127.0.0.1:3999")
+	if err != nil {
+		log.Fatal("Could not start listen for incomming data to scan: ", err) 	
+	}
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Print("Could not open connexion for this client : ", err) 
+		}
+		go handleConnection(conn)
+	}
+}
+
 func handleConnection(conn net.Conn) {
 	dec := gob.NewDecoder(conn)
 	for {
@@ -75,20 +87,10 @@ func runScan(c *cli.Context) {
 	// check for work in current data 
 	log.Print("checking for work in data readed from configuration files")
 	log.Print("Sending data to worker")
-	log.Print("Listening for incoming connection to treat new scans")
 		
 	// écoute des connexions réseau : 
-	ln, err := net.Listen("tcp", "127.0.0.1:3999")
-	if err != nil {
-		log.Fatal("Could not start listen for incomming data to scan: ", err) 	
-	}
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Print("Could not open connexion for this client : ", err) 
-		}
-		go handleConnection(conn)
-	}
+
+	listenGansScan()
 
 
 }
