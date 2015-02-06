@@ -10,8 +10,8 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "Parns"
-	app.Usage = "Command de gestion de scan d'hôte distants"
+	app.Name = "Gans"
+	app.Usage = "Go automated Nmap scanner"
 	app.Commands = []cli.Command{
 		cmd.CmdScan,
 		cmd.CmdRun,
