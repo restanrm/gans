@@ -3,31 +3,30 @@ package cmd
 import (
 	"github.com/codegangsta/cli"
 	"strings"
-	//	"database/sql"
-//	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os/exec"
 	"encoding/gob"
 	"net"
-//	"encoding/json"
-	"fmt"
-//	"github.com/restanrm/scanner/dao"
+	"os"
+	"bufio"
+// "fmt"
 )
 
 var CmdScan = cli.Command{
 	Name:   "scan",
-	Usage:  "Ajoute des IP dans la base de données",
+	Usage:  "Envoi des adresses IP à scanner au processus principal",
 	Action: runScanner,
-	Description: "Cette commande reçoit des adresses ou plages d'adresses au format de nmap pour les ajouter dans la base de données des adresses à scanner.", 
+	Description: "Cette commande reçoit des adresse IP ou des plages d'adresses IP ou un fichiers de description, et les envois au manager.", 
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		cli.StringFlag{
 			Name:  "f, file",
-			Usage: "With this argument, the first argument is considered as a file with an IP at each line",
+			Value: "",
+			Usage: "Send each line of the file to manager for scanning",
 		},
 	},
 }
 
-/* Cette commande permet d'extraire une liste d'adresse IP à partir un tableau d'octets */
+// This function extract list of IP Address from nmap command output in []byte
 func filter_nmap_list_command(b []byte) []string {
 	outlist := make([]string, 0, 10)
 	index := 0
@@ -47,38 +46,56 @@ func filter_nmap_list_command(b []byte) []string {
 	return outlist
 }
 
-func runScanner(c *cli.Context) {
-	// init bdd
-	if !c.Args().Present() {
-		log.Fatal("Pas d'argument, voir les consignes d'utilisations.")
-	}
-	/*
-	con, err := dao.Open("./database.sqlite3")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer con.Close()
-	*/
-
-	// Connexion au serveur de gestion des scan
+// Create a new connection to the server 
+func newConnection() net.Conn {
 	conn, err := net.Dial("tcp", "localhost:3999")
 	if err != nil {
-		log.Fatal("Failed to connect to server: ", err) 
+		log.Fatal("Failed to connect to server: ", err)
 	}
+	return conn
+}
+
+func runScanner(c *cli.Context) {
+	if !c.Args().Present() && (c.String("file") == "") {
+		cli.ShowCommandHelp(c, "scan")
+	}
+
+	// Connexion au serveur de gestion des scan
+	conn := newConnection()
 	defer conn.Close()
+
+	//initialisation de l'encodeur
 	encoder := gob.NewEncoder(conn)
 
-	log.Print("Lancement de Nmap pour obtenir la liste des adresses correspondant à : ", c.Args().First())
-	nmap_list_bytes, err := exec.Command("nmap", "-n", "-sL", c.Args().First()).Output()
-	if err != nil {
-		log.Fatal(err)
+	if c.String("file") != "" {
+		file, err := os.Open(c.String("file"))	
+		if err != nil {
+			log.Fatal("Could not open file:  ", err)
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			elt := scanner.Text() // need to filter data from client.
+			scan := Scan{elt, null, Result{}}
+			encoder.Encode(scan)
+		}
+		log.Printf("IP addresses from %q has been sent\n", c.String("file"))
+	} else {
+		// for each argument, run nmap on it and send it to network
+		for _, argument := range c.Args() {
+			nmap_list_bytes, err := exec.Command("nmap", "-n", "-sL", argument).Output() 
+			if err != nil {
+				log.Fatal("L'execution de la commande « nmap » n'as pas fonctionnée : ", err)
+			}
+			outlist := filter_nmap_list_command(nmap_list_bytes)
+			if len(outlist) == 0 { // if outlist is void, pass 
+				continue
+			}
+			for _, elt := range outlist {
+				scan := Scan{elt, null, Result{}}
+				encoder.Encode(scan)
+			}
+			log.Printf("IP address from %v has been sent\n", argument)
+		}
 	}
-	outlist := filter_nmap_list_command(nmap_list_bytes)
-
-	for _, elt := range outlist {
-		scan := Scan{elt, null, Result{}}
-		fmt.Println(scan)
-		encoder.Encode(scan)
-	}
-	log.Print("Data sent to server")
 }
