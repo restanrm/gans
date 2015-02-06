@@ -1,7 +1,7 @@
 package cmd
 
 const (
-	null = iota 
+	null = iota
 	icmp_in_progress
 	icmp_finished
 	nmap_in_progress
@@ -9,7 +9,7 @@ const (
 )
 
 type Scan struct {
-	Host string
+	Host   string
 	Status int
 	Result Result
 }

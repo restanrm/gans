@@ -1,12 +1,12 @@
 package cmd
 
 import (
+	"encoding/gob"
 	"fmt"
 	"github.com/codegangsta/cli"
-	"net"
-	"encoding/gob"
-	"log"
 	"io"
+	"log"
+	"net"
 )
 
 var CmdRun = cli.Command{
@@ -34,16 +34,16 @@ func worker(inputScan chan Scan) {
 }
 */
 
-func listenGansScan(){
+func listenGansScan() {
 	log.Print("Waiting for incomming connection")
 	ln, err := net.Listen("tcp", "127.0.0.1:3999")
 	if err != nil {
-		log.Fatal("Could not start listen for incomming data to scan: ", err) 	
+		log.Fatal("Could not start listen for incomming data to scan: ", err)
 	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Print("Could not open connexion for this client : ", err) 
+			log.Print("Could not open connexion for this client : ", err)
 		}
 		go handleConnection(conn)
 	}
@@ -56,7 +56,7 @@ func handleConnection(conn net.Conn) {
 		err := dec.Decode(&scan)
 		switch {
 		case err == io.EOF:
-			return 
+			return
 		case err != nil:
 			log.Print("Could not decode packet from client : ", err)
 		}
@@ -71,26 +71,25 @@ func runScan(c *cli.Context) {
 	// read work data from datafile where everything is stored.
 	log.Print("Read data from saved files")
 
-	// launch workers 
+	// launch workers
 	log.Print("Launching worker to nmap scan dest files")
 	// getAllHostList(con)
 	//
 	//comm := WorkerPool(5)
 	// Create workers
-	// 
+	//
 	// boucle infini sur la recherche de machines à scanner dans la base de données
-	// 
+	//
 	// envoi de ces données de scan aux workers
 
 	//input := WorkerPool(5)
 
-	// check for work in current data 
+	// check for work in current data
 	log.Print("checking for work in data readed from configuration files")
 	log.Print("Sending data to worker")
-		
-	// écoute des connexions réseau : 
+
+	// écoute des connexions réseau :
 
 	listenGansScan()
-
 
 }

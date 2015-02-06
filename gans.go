@@ -1,4 +1,4 @@
-// GANS : Go Automated Nmap Scanner 
+// GANS : Go Automated Nmap Scanner
 // This permit to launch a scanner and add adresses to be scanned.
 package main
 

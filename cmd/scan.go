@@ -1,22 +1,22 @@
 package cmd
 
 import (
-	"github.com/codegangsta/cli"
-	"strings"
-	"log"
-	"os/exec"
+	"bufio"
 	"encoding/gob"
+	"github.com/codegangsta/cli"
+	"log"
 	"net"
 	"os"
-	"bufio"
-// "fmt"
+	"os/exec"
+	"strings"
+	// "fmt"
 )
 
 var CmdScan = cli.Command{
-	Name:   "scan",
-	Usage:  "Envoi des adresses IP à scanner au processus principal",
-	Action: runScanner,
-	Description: "Cette commande reçoit des adresse IP ou des plages d'adresses IP ou un fichiers de description, et les envois au manager.", 
+	Name:        "scan",
+	Usage:       "Envoi des adresses IP à scanner au processus principal",
+	Action:      runScanner,
+	Description: "Cette commande reçoit des adresse IP ou des plages d'adresses IP ou un fichiers de description, et les envois au manager.",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "f, file",
@@ -46,7 +46,7 @@ func filter_nmap_list_command(b []byte) []string {
 	return outlist
 }
 
-// Create a new connection to the server 
+// Create a new connection to the server
 func newConnection() net.Conn {
 	conn, err := net.Dial("tcp", "localhost:3999")
 	if err != nil {
@@ -68,7 +68,7 @@ func runScanner(c *cli.Context) {
 	encoder := gob.NewEncoder(conn)
 
 	if c.String("file") != "" {
-		file, err := os.Open(c.String("file"))	
+		file, err := os.Open(c.String("file"))
 		if err != nil {
 			log.Fatal("Could not open file:  ", err)
 		}
@@ -83,12 +83,12 @@ func runScanner(c *cli.Context) {
 	} else {
 		// for each argument, run nmap on it and send it to network
 		for _, argument := range c.Args() {
-			nmap_list_bytes, err := exec.Command("nmap", "-n", "-sL", argument).Output() 
+			nmap_list_bytes, err := exec.Command("nmap", "-n", "-sL", argument).Output()
 			if err != nil {
 				log.Fatal("L'execution de la commande « nmap » n'as pas fonctionnée : ", err)
 			}
 			outlist := filter_nmap_list_command(nmap_list_bytes)
-			if len(outlist) == 0 { // if outlist is void, pass 
+			if len(outlist) == 0 { // if outlist is void, pass
 				continue
 			}
 			for _, elt := range outlist {
