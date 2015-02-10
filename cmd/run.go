@@ -13,32 +13,42 @@ var CmdRun = cli.Command{
 	Name:   "run",
 	Usage:  "Lance les routines de scan des adresses de destinations",
 	Action: runScan,
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "listen, l",
+			Value: "localhost:3999",
+			Usage: "Set listen address and port",
+		},
+		cli.StringFlag{
+			Name:  "database, d",
+			Value: "test.json",
+			Usage: "Database filename for Json output",
+		},
+	},
 }
 
+var database_file string
 var scans Scans
 
-/*
-type Scan struct {
-	Path, IPRange string
-}
-
-func WorkerPool(workerPoolSize int) chan Scan {
-	var inputScan chan Scan = make(chan Scan)
+func workerPool(workerPoolSize int, input_work chan *Scan) {
 	for i := 0; i < workerPoolSize; i++ {
-		go worker(inputScan)
+		go worker(<-input_work)
 	}
-	return inputScan
 }
 
-func worker(inputScan chan Scan) {
-	// do the scanning function and store result in Scan.Path files
-
+func worker(inputScan *Scan) {
+	inputScan.Status = icmp_in_progress
+	// do the ping
+	// put result in inputScan.Result.Icmp
+	inputScan.Status = nmap_in_progress
+	// do the scanning function
+	// store result in Scan.Result.Nmap
+	inputScan.Status = finished
 }
-*/
 
-func listenGansScan() {
+func listenGansScan(listen_address string) {
 	log.Print("Waiting for incomming connection")
-	ln, err := net.Listen("tcp", "127.0.0.1:3999")
+	ln, err := net.Listen("tcp", listen_address)
 	if err != nil {
 		log.Fatal("Could not start listen for incomming data to scan: ", err)
 	}
@@ -55,7 +65,7 @@ func handleConnection(conn net.Conn) {
 	dec := gob.NewDecoder(conn)
 	// Save all captured order to file "test.json" for now when the client is closing connection
 	defer func() {
-		err := scans.Save("test.json")
+		err := scans.Save(database_file)
 		if err != nil {
 			log.Print("Could not save data to file : ", err)
 		}
@@ -91,12 +101,13 @@ func runScan(c *cli.Context) {
 	scans = make(Scans, 0, 100)
 	// read work data from datafile where everything is stored.
 	log.Print("Read data from saved files")
-	scans.Load("test.json")
+	database_file = c.String("database")
+	scans.Load(database_file)
 
 	// launch workers
+	var work_input chan *Scan = make(chan *Scan, 10)
+	workerPool(5, work_input)
 	log.Print("Launching worker to nmap scan dest files")
-	// getAllHostList(con)
-	//
 	//comm := WorkerPool(5)
 	// Create workers
 	//
@@ -112,6 +123,6 @@ func runScan(c *cli.Context) {
 
 	// écoute des connexions réseau :
 
-	listenGansScan()
+	listenGansScan(c.String("listen"))
 
 }

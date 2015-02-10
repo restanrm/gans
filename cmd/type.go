@@ -9,9 +9,8 @@ import (
 const (
 	null = iota
 	icmp_in_progress
-	icmp_finished
 	nmap_in_progress
-	nmap_finished
+	finished
 )
 
 type Scan struct {
