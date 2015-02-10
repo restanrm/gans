@@ -15,6 +15,8 @@ var CmdRun = cli.Command{
 	Action: runScan,
 }
 
+var scans Scans
+
 /*
 type Scan struct {
 	Path, IPRange string
@@ -51,6 +53,13 @@ func listenGansScan() {
 
 func handleConnection(conn net.Conn) {
 	dec := gob.NewDecoder(conn)
+	// Save all captured order to file "test.json" for now when the client is closing connection
+	defer func() {
+		err := scans.Save("test.json")
+		if err != nil {
+			log.Print("Could not save data to file : ", err)
+		}
+	}()
 	for {
 		var scan Scan
 		err := dec.Decode(&scan)
@@ -58,7 +67,19 @@ func handleConnection(conn net.Conn) {
 		case err == io.EOF:
 			return
 		case err != nil:
-			log.Print("Could not decode packet from client : ", err)
+			log.Print("Could not decode packet from client : ", err)
+		}
+		var ok bool
+		for _, s := range scans {
+			if scan.Equal(&s) {
+				fmt.Printf("%v already in database\n", scan.Host)
+				ok = true
+			}
+		}
+		if !ok {
+			scans = append(scans, scan)
+		} else {
+			continue
 		}
 		fmt.Printf("received order to scan IP: %v\n", scan.Host)
 		// verify if data is not already into worker and send it to worker if it is not the case.
@@ -67,9 +88,10 @@ func handleConnection(conn net.Conn) {
 
 func runScan(c *cli.Context) {
 	fmt.Println("Commande principale qui permet de faire fonctionner les scan en tâche de fond")
-
+	scans = make(Scans, 0, 100)
 	// read work data from datafile where everything is stored.
 	log.Print("Read data from saved files")
+	scans.Load("test.json")
 
 	// launch workers
 	log.Print("Launching worker to nmap scan dest files")
