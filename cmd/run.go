@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 )
 
 var CmdRun = cli.Command{
@@ -27,35 +28,49 @@ var CmdRun = cli.Command{
 	},
 }
 
-var database_file string
-var scans Scans
+var (
+	database_file string
+	scans         Scans
+	ch_scan       chan *Scan
+	mutex         sync.Mutex
+)
 
-func workerPool(workerPoolSize int, input_work chan *Scan) {
+func workerPool(workerPoolSize int) {
 	for i := 0; i < workerPoolSize; i++ {
-		go worker(<-input_work)
+		go worker()
 	}
 }
 
-func worker(inputScan *Scan) {
-	inputScan.Status = icmp_in_progress
-	// do the ping
-	// put result in inputScan.Result.Icmp
-	inputScan.Status = nmap_in_progress
-	// do the scanning function
-	// store result in Scan.Result.Nmap
-	inputScan.Status = finished
+func worker() {
+	var s *Scan
+	for {
+		s = <-ch_scan
+		log.Printf("Received Work : %v\n", s.Host)
+		s.Status = icmp_in_progress
+		// do the ping
+		// put result in inputScan.Result.Icmp
+		s.Status = nmap_in_progress
+		// do the scanning function
+		// store result in Scan.Result.Nmap
+		s.Status = finished
+
+		log.Printf("Finished Work : %v\n", s.Host)
+		mutex.Lock()
+		scans.Save(database_file)
+		mutex.Unlock()
+	}
 }
 
 func listenGansScan(listen_address string) {
-	log.Print("Waiting for incomming connection")
+	log.Print("Waiting for incoming connection")
 	ln, err := net.Listen("tcp", listen_address)
 	if err != nil {
-		log.Fatal("Could not start listen for incomming data to scan: ", err)
+		log.Fatal("Could not start listen for incoming data to scan: ", err)
 	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Print("Could not open connexion for this client : ", err)
+			log.Print("Could not open connection for this client : ", err)
 		}
 		go handleConnection(conn)
 	}
@@ -80,49 +95,45 @@ func handleConnection(conn net.Conn) {
 			log.Print("Could not decode packet from client : ", err)
 		}
 		var ok bool
+		// this allow to verify if scan is not already in the scan list
 		for _, s := range scans {
-			if scan.Equal(&s) {
+			if scan.Host == s.Host {
 				fmt.Printf("%v already in database\n", scan.Host)
 				ok = true
 			}
 		}
 		if !ok {
 			scans = append(scans, scan)
+			ch_scan <- &scans[len(scans)-1]
 		} else {
 			continue
 		}
-		fmt.Printf("received order to scan IP: %v\n", scan.Host)
-		// verify if data is not already into worker and send it to worker if it is not the case.
+		fmt.Printf("received order to scan IP: %v, %p\n", scan.Host, &scan)
 	}
 }
 
 func runScan(c *cli.Context) {
-	fmt.Println("Commande principale qui permet de faire fonctionner les scan en tâche de fond")
+	// création de la structure de scan
 	scans = make(Scans, 0, 100)
+
 	// read work data from datafile where everything is stored.
 	log.Print("Read data from saved files")
 	database_file = c.String("database")
 	scans.Load(database_file)
 
 	// launch workers
-	var work_input chan *Scan = make(chan *Scan, 10)
-	workerPool(5, work_input)
 	log.Print("Launching worker to nmap scan dest files")
-	//comm := WorkerPool(5)
-	// Create workers
-	//
-	// boucle infini sur la recherche de machines à scanner dans la base de données
-	//
-	// envoi de ces données de scan aux workers
+	ch_scan = make(chan *Scan)
+	workerPool(5)
 
-	//input := WorkerPool(5)
-
-	// check for work in current data
-	log.Print("checking for work in data readed from configuration files")
-	log.Print("Sending data to worker")
+	// initial feeder
+	for i := 0; i < len(scans); i++ {
+		if scans[i].Status == null {
+			ch_scan <- &scans[i]
+		}
+	}
 
 	// écoute des connexions réseau :
-
 	listenGansScan(c.String("listen"))
 
 }
