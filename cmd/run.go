@@ -7,7 +7,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/exec"
 	"sync"
+	"time"
 )
 
 var CmdRun = cli.Command{
@@ -29,10 +32,11 @@ var CmdRun = cli.Command{
 }
 
 var (
-	database_file string
-	scans         Scans
-	ch_scan       chan *Scan
-	mutex         sync.Mutex
+	database_file      string
+	scans              Scans
+	ch_scan            chan *Scan
+	mutex              sync.Mutex
+	notification_delay time.Duration = 5 * time.Second
 )
 
 func workerPool(workerPoolSize int) {
@@ -43,21 +47,55 @@ func workerPool(workerPoolSize int) {
 
 func worker() {
 	var s *Scan
+	var err error
+	var cmd *exec.Cmd
 	for {
 		s = <-ch_scan
 		log.Printf("Received Work : %v\n", s.Host)
 		s.Status = icmp_in_progress
 		// do the ping
-		// put result in inputScan.Result.Icmp
+		cmd = exec.Command("/bin/ping", "-c", "2", s.Host)
+		s.Result.Icmp, err = cmd.Output()
+		if err != nil {
+			log.Printf("Failed to ping destination %s: %s", s.Host, err)
+			s.Result.Icmp = []byte("Failed")
+		}
 		s.Status = nmap_in_progress
-		// do the scanning function
-		// store result in Scan.Result.Nmap
-		s.Status = finished
-
-		log.Printf("Finished Work : %v\n", s.Host)
-		mutex.Lock()
-		scans.Save(database_file)
-		mutex.Unlock()
+		log.Printf("Ping done for %v\n", s.Host)
+		// Prepare « nmap » command and call
+		cmd = exec.Command("nmap",
+			"-n",
+			"-T3",
+			"-sS",
+			"-sV",
+			"-oX", "-",
+			"--verbose",
+			"-p -",
+			s.Host)
+		result := make(chan []byte)
+		ticker := time.Tick(notification_delay)
+		// There is a goroutine to handle long treatment
+		// this is used to keep monitoring of « nmap » activity
+		go func() {
+			tmp, err := cmd.Output()
+			if err != nil {
+				log.Printf("Failed to nmap destination %s: %s", s.Host, err)
+			}
+			result <- tmp
+		}()
+		for end := false; !end; {
+			select {
+			case s.Result.Nmap = <-result:
+				s.Status = finished
+				log.Printf("Finished Work for %v\n", s.Host)
+				mutex.Lock()
+				scans.Save(database_file)
+				mutex.Unlock()
+				end = true
+			case <-ticker:
+				log.Printf("Work in progress for %v\n", s.Host)
+			}
+		}
 	}
 }
 
@@ -108,11 +146,15 @@ func handleConnection(conn net.Conn) {
 		} else {
 			continue
 		}
-		fmt.Printf("received order to scan IP: %v, %p\n", scan.Host, &scan)
 	}
 }
 
 func runScan(c *cli.Context) {
+	// Check for root now, better solution has to be found
+	if os.Geteuid() != 0 {
+		fmt.Println("This program need to have root permission to execute nmap for now.")
+		os.Exit(1)
+	}
 	// création de la structure de scan
 	scans = make(Scans, 0, 100)
 
