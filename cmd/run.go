@@ -28,6 +28,16 @@ var CmdRun = cli.Command{
 			Value: "test.json",
 			Usage: "Database filename for Json output",
 		},
+		cli.IntFlag{
+			Name:  "notification-delay, n",
+			Value: 5,
+			Usage: "This is the notification delay to keep track of current working scan",
+		},
+		cli.IntFlag{
+			Name:  "worker, w",
+			Value: 5,
+			Usage: "Handle number of thread simultaneously running",
+		},
 	},
 }
 
@@ -36,7 +46,7 @@ var (
 	scans              Scans
 	ch_scan            chan *Scan
 	mutex              sync.Mutex
-	notification_delay time.Duration = 5 * time.Second
+	notification_delay time.Duration
 )
 
 func workerPool(workerPoolSize int) {
@@ -155,6 +165,9 @@ func runScan(c *cli.Context) {
 		fmt.Println("This program need to have root permission to execute nmap for now.")
 		os.Exit(1)
 	}
+
+	notification_delay = time.Duration(c.Int("notification-delay")) * time.Second
+
 	// création de la structure de scan
 	scans = make(Scans, 0, 100)
 
@@ -166,7 +179,7 @@ func runScan(c *cli.Context) {
 	// launch workers
 	log.Print("Launching worker to nmap scan dest files")
 	ch_scan = make(chan *Scan)
-	workerPool(5)
+	workerPool(c.Int("worker"))
 
 	// initial feeder
 	for i := 0; i < len(scans); i++ {
