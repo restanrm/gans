@@ -14,9 +14,9 @@ import (
 
 var CmdScan = cli.Command{
 	Name:        "scan",
-	Usage:       "Envoi des adresses IP à scanner au processus principal",
+	Usage:       "Send IP addresses to main process",
 	Action:      runScanner,
-	Description: "Cette commande reçoit des adresse IP ou des plages d'adresses IP ou un fichiers de description, et les envois au manager.",
+	Description: "This command receive IP adresses, network range or a file with an IP address per line and send it to manager.",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "f, file",
@@ -85,7 +85,7 @@ func runScanner(c *cli.Context) {
 		for _, argument := range c.Args() {
 			nmap_list_bytes, err := exec.Command("nmap", "-n", "-sL", argument).Output()
 			if err != nil {
-				log.Fatal("L'execution de la commande « nmap » n'as pas fonctionnée : ", err)
+				log.Fatal("Execution of \"nmap\" command failed: ", err)
 			}
 			outlist := filter_nmap_list_command(nmap_list_bytes)
 			if len(outlist) == 0 { // if outlist is void, pass
