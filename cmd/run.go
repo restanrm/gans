@@ -49,6 +49,8 @@ var (
 	notification_delay time.Duration
 )
 
+const buffered_channel_size = 1 << 16
+
 func workerPool(workerPoolSize int) {
 	for i := 0; i < workerPoolSize; i++ {
 		go worker()
@@ -178,7 +180,7 @@ func runScan(c *cli.Context) {
 
 	// launch workers
 	log.Print("Launching worker to nmap scan dest files")
-	ch_scan = make(chan *Scan)
+	ch_scan = make(chan *Scan, buffered_channel_size)
 	workerPool(c.Int("worker"))
 
 	// initial feeder
