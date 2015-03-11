@@ -185,7 +185,7 @@ func runScan(c *cli.Context) {
 
 	// initial feeder
 	for i := 0; i < len(scans); i++ {
-		if scans[i].Status == null {
+		if scans[i].Status != finished {
 			ch_scan <- &scans[i]
 		}
 	}
