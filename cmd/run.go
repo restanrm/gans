@@ -143,6 +143,7 @@ func handleConnection(conn net.Conn) {
 			return
 		case err != nil:
 			log.Print("Could not decode packet from client : ", err)
+			return
 		}
 		var ok bool
 		// this allow to verify if scan is not already in the scan list
