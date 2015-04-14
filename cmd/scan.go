@@ -8,8 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strings"
-	// "fmt"
+	"regexp"
 )
 
 var CmdScan = cli.Command{
@@ -26,22 +25,30 @@ var CmdScan = cli.Command{
 	},
 }
 
-// This function extract list of IP Address from nmap command output in []byte
+// This function extract list of IP Address from nmap command output in []byte
 func filter_nmap_list_command(b []byte) []string {
+	inlist := make([]string, 0, 10)
 	outlist := make([]string, 0, 10)
 	index := 0
-	outlist = append(outlist, "")
+	inlist = append(inlist, "")
+	reg, err := regexp.Compile("Nmap scan report for ([a-zA-Z0-9.]+)")
+	if err != nil {
+		return nil
+	}
 	for _, char := range b { // Convert []byte into a []string
 		if char != '\n' {
-			outlist[index] = outlist[index] + string(char)
+			inlist[index] = inlist[index] + string(char)
 		} else {
 			index += 1
-			outlist = append(outlist, "")
+			inlist = append(inlist, "")
 		}
 	}
-	outlist = outlist[2 : len(outlist)-2]
-	for i, line := range outlist { // get only the 5th elements of the line
-		outlist[i] = strings.Fields(line)[4]
+	inlist = inlist[2 : len(inlist)-2]
+	for _, line := range inlist {
+		res := reg.FindStringSubmatch(line)
+		if res != nil {
+			outlist = append(outlist, res[1])
+		}
 	}
 	return outlist
 }
