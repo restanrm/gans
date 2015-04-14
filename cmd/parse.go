@@ -9,7 +9,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/restanrm/gans/nmap"
 	"log"
-	//	"os"
+	//"net"
+	"strconv"
 	"strings"
 )
 
@@ -39,6 +40,46 @@ var CmdParse = cli.Command{
 			Usage: "Désactive la sauvegarde en base de données et préfère une sortie texte des donnée",
 		},
 	},
+}
+
+// Draft de structure de base de données
+// Cette structure correspond a ce qui se trouve dans la base de données locale
+type Service struct {
+	Protocol,
+	Name,
+	Version,
+	Product,
+	OsType string
+}
+
+func (s Service) String() string {
+	return fmt.Sprintf("%v, %v, %v, %v", s.Protocol, s.Name, s.Version, s.Product)
+}
+
+type Port struct {
+	Number  int
+	Status  string
+	Service Service
+}
+
+func (p Port) String() string {
+	return fmt.Sprintf("\t%v: %v; %v\n", p.Number, p.Status, p.Service)
+}
+
+type Host struct {
+	Address string
+	Status  string
+	Os      string
+	Ports   []Port
+}
+
+func (h Host) String() string {
+	var out string = ""
+	out = fmt.Sprintf("%v: %v\n", h.Address, h.Status)
+	for _, port := range h.Ports {
+		out += port.String()
+	}
+	return out
 }
 
 func getNmapHostId(con *sql.DB, hosts []nmap.XMLHost) (int, error) {
@@ -108,20 +149,44 @@ func createServices(con *sql.DB, hostid int, hosts []nmap.XMLHost) {
 	}
 }
 
-func listOpenPorts(hosts []nmap.XMLHost) string {
-	var out string
-	var sep string = ","
+func listPorts(hosts []nmap.XMLHost) []Port {
+	t_ports := make([]Port, 0, 10)
 	for _, host := range hosts {
 		for _, ports := range host.Ports {
 			for _, port := range ports.Port {
-				if port.State.State == "open" {
-					out = strings.Join([]string{out, port.Portid}, sep)
+				service := Service{
+					Protocol: port.Service.Proto,
+					Name:     port.Service.Name,
+					Version:  port.Service.Version,
+					Product:  port.Service.Product,
+					OsType:   port.Service.Ostype,
 				}
+				p_id, _ := strconv.Atoi(port.Portid)
+				t_ports = append(t_ports, Port{Number: p_id, Status: port.State.State, Service: service})
 			}
 		}
 	}
+	return t_ports
+}
 
-	return strings.TrimPrefix(out, sep)
+func get_status(hosts []nmap.XMLHost) string {
+	for _, host := range hosts {
+		for _, statuses := range host.Status {
+			return statuses.State
+		}
+	}
+	return ""
+}
+
+func get_os(hosts []nmap.XMLHost) string {
+	for _, host := range hosts {
+		for _, oses := range host.Os {
+			for _, osmatch := range oses.Osmatch {
+				return osmatch.Name
+			}
+		}
+	}
+	return ""
 }
 
 // Parse data from file in parameter
@@ -141,10 +206,13 @@ func parseAllXmlData(con *sql.DB, filepath string) {
 			return
 		}
 
-		ports := listOpenPorts(v.Host)
-		if ports != "" {
-			fmt.Printf("%v;%v\n", scan.Host, ports)
-		}
+		host := Host{
+			Address: scan.Host,
+			Status:  get_status(v.Host),
+			Os:      get_os(v.Host),
+			Ports:   listPorts(v.Host)}
+
+		fmt.Println(host)
 
 		// Saisie des données dans la base de données de SANOFI
 		/*
