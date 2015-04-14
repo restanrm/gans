@@ -45,7 +45,6 @@ var CmdParse = cli.Command{
 // Draft de structure de base de données
 // Cette structure correspond a ce qui se trouve dans la base de données locale
 type Service struct {
-	Protocol,
 	Name,
 	Version,
 	Product,
@@ -53,17 +52,18 @@ type Service struct {
 }
 
 func (s Service) String() string {
-	return fmt.Sprintf("%v, %v, %v, %v", s.Protocol, s.Name, s.Version, s.Product)
+	return fmt.Sprintf("%v, %v, %v", s.Name, s.Version, s.Product)
 }
 
 type Port struct {
-	Number  int
-	Status  string
-	Service Service
+	Number   int
+	Protocol string
+	Status   string
+	Service  Service
 }
 
 func (p Port) String() string {
-	return fmt.Sprintf("\t%v: %v; %v\n", p.Number, p.Status, p.Service)
+	return fmt.Sprintf("  %-6v: %v; %v, %v\n", p.Number, p.Status, p.Protocol, p.Service)
 }
 
 type Host struct {
@@ -154,15 +154,21 @@ func listPorts(hosts []nmap.XMLHost) []Port {
 	for _, host := range hosts {
 		for _, ports := range host.Ports {
 			for _, port := range ports.Port {
-				service := Service{
-					Protocol: port.Service.Proto,
-					Name:     port.Service.Name,
-					Version:  port.Service.Version,
-					Product:  port.Service.Product,
-					OsType:   port.Service.Ostype,
+				var service Service
+				if port.Service != nil {
+					service = Service{
+						Name:    port.Service.Name,
+						Version: port.Service.Version,
+						Product: port.Service.Product,
+						OsType:  port.Service.Ostype,
+					}
 				}
 				p_id, _ := strconv.Atoi(port.Portid)
-				t_ports = append(t_ports, Port{Number: p_id, Status: port.State.State, Service: service})
+				t_ports = append(t_ports, Port{
+					Number:   p_id,
+					Protocol: port.Protocol,
+					Status:   port.State.State,
+					Service:  service})
 			}
 		}
 	}
@@ -212,7 +218,7 @@ func parseAllXmlData(con *sql.DB, filepath string) {
 			Os:      get_os(v.Host),
 			Ports:   listPorts(v.Host)}
 
-		fmt.Println(host)
+		fmt.Print(host)
 
 		// Saisie des données dans la base de données de SANOFI
 		/*
