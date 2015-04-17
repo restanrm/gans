@@ -22,6 +22,11 @@ var CmdScan = cli.Command{
 			Value: "",
 			Usage: "Send each line of the file to manager for scanning",
 		},
+		cli.StringFlag{
+			Name:  "listen, l",
+			Value: "localhost:3999",
+			Usage: "Unix socket to send scan orders",
+		},
 	},
 }
 
@@ -54,8 +59,8 @@ func filter_nmap_list_command(b []byte) []string {
 }
 
 // Create a new connection to the server
-func newConnection() net.Conn {
-	conn, err := net.Dial("tcp", "localhost:3999")
+func newConnection(listen_address string) net.Conn {
+	conn, err := net.Dial("tcp", listen_address)
 	if err != nil {
 		log.Fatal("Failed to connect to server: ", err)
 	}
@@ -68,7 +73,7 @@ func runScanner(c *cli.Context) {
 	}
 
 	// Connexion au serveur de gestion des scan
-	conn := newConnection()
+	conn := newConnection(c.String("listen"))
 	defer conn.Close()
 
 	//initialisation de l'encodeur
