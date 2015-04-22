@@ -11,6 +11,7 @@ const (
 	icmp_in_progress
 	nmap_in_progress
 	finished
+	failed
 )
 
 type Scan struct {

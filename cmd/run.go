@@ -57,23 +57,26 @@ func workerPool(workerPoolSize int) {
 	}
 }
 
+func ping(s *Scan) {
+	cmd := exec.Command("/bin/ping", "-c", "2", s.Host)
+	var err error
+	s.Result.Icmp, err = cmd.Output()
+	if err != nil {
+		log.Printf("Failed to ping destination %s: %s", s.Host, err)
+		s.Result.Icmp = []byte("Failed")
+	}
+	s.Status = nmap_in_progress
+	log.Printf("Ping done for %v\n", s.Host)
+}
+
 func worker() {
 	var s *Scan
-	var err error
 	var cmd *exec.Cmd
 	for {
 		s = <-ch_scan
 		log.Printf("Received Work : %v\n", s.Host)
 		s.Status = icmp_in_progress
-		// do the ping
-		cmd = exec.Command("/bin/ping", "-c", "2", s.Host)
-		s.Result.Icmp, err = cmd.Output()
-		if err != nil {
-			log.Printf("Failed to ping destination %s: %s", s.Host, err)
-			s.Result.Icmp = []byte("Failed")
-		}
-		s.Status = nmap_in_progress
-		log.Printf("Ping done for %v\n", s.Host)
+		ping(s)
 		// Prepare « nmap » command and call
 		cmd = exec.Command("nmap",
 			"-n",
@@ -108,6 +111,7 @@ func worker() {
 				log.Printf("Work in progress for %v\n", s.Host)
 			}
 		}
+		s.Status = finished
 	}
 }
 
