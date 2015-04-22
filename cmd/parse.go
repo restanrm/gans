@@ -106,49 +106,6 @@ func getNmapHostId(con *sql.DB, hosts []nmap.XMLHost) (int, error) {
 	}
 }
 
-func queryServiceId(con *sql.DB, hostid int, port nmap.XMLPort) {
-	var t int
-	var err error
-	if port.Service != nil {
-		err = con.QueryRow("select id from service where hostid=? and port=? and protocol=? and product=? and version=? and service=?",
-			hostid, port.Portid, port.Protocol, port.Service.Product, port.Service.Version, port.Service.Name).Scan(&t)
-	} else {
-		err = con.QueryRow("select id from service where hostid=? and port=? and protocol=?", hostid, port.Portid, port.Protocol).Scan(&t)
-	}
-	switch {
-	case err == sql.ErrNoRows:
-		var err error
-		if port.Service != nil && port.State != nil {
-			_, err = con.Exec("INSERT INTO service (hostid, port, protocol, service, state, product, version) VALUES (?,?,?,?,?,?,?)",
-				hostid, port.Portid, port.Protocol, port.Service.Name, port.State.State, port.Service.Product, port.Service.Version)
-		} else if port.Service != nil && port.State == nil {
-			_, err = con.Exec("INSERT INTO service (hostid, port, protocol, service, product, version) VALUES (?,?,?,?,?,?)",
-				hostid, port.Portid, port.Protocol, port.Service.Name, port.Service.Product, port.Service.Version)
-		} else if port.Service == nil && port.State != nil {
-			_, err = con.Exec("INSERT INTO service (hostid, port, protocol, service, state, product, version) VALUES (?,?,?,?,?,?,?)",
-				hostid, port.Portid, port.Protocol, "", port.State.State, "", "")
-		} else {
-			_, err = con.Exec("INSERT INTO service (hostid, port, protocol) VALUES (?,?,?)", hostid, port.Portid, port.Protocol)
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-	case err != nil:
-		log.Fatal(err)
-	default:
-	}
-}
-
-func createServices(con *sql.DB, hostid int, hosts []nmap.XMLHost) {
-	for _, host := range hosts {
-		for _, ports := range host.Ports {
-			for _, port := range ports.Port {
-				queryServiceId(con, hostid, port)
-			}
-		}
-	}
-}
-
 func listPorts(hosts []nmap.XMLHost) []Port {
 	t_ports := make([]Port, 0, 10)
 	for _, host := range hosts {
@@ -196,7 +153,7 @@ func get_os(hosts []nmap.XMLHost) string {
 }
 
 // Parse data from file in parameter
-func parseAllXmlData(con *sql.DB, filepath string) {
+func parseAllXmlData(filepath string) {
 	scans := make(Scans, 0, 100)
 	scans.Load(filepath)
 	for _, scan := range scans {
@@ -219,18 +176,6 @@ func parseAllXmlData(con *sql.DB, filepath string) {
 			Ports:   listPorts(v.Host)}
 
 		fmt.Print(host)
-
-		// Saisie des données dans la base de données de SANOFI
-		/*
-			// v contient l'ensemble des données nmap de cet hôte.
-			hostid, err := getNmapHostId(con, v.Host)
-			if err != nil {
-				log.Printf("Retrieving hostid for host %v failed: %v", v.Host, err)
-				return
-			}
-			createServices(con, hostid, v.Host)
-		*/
-
 	}
 }
 
@@ -238,23 +183,5 @@ func parseRun(c *cli.Context) {
 	if !c.Args().Present() {
 		log.Fatal("Need a json file to parse")
 	}
-
-	// Test de l'existence de la base de données. Si ce n'est pas le cas, la créer
-	// TODO
-
-	// connect to database
-	con, err := sql.Open("mysql", c.String("user")+":"+c.String("password")+"@/"+c.String("database"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer con.Close()
-
-	parseAllXmlData(con, c.Args().First())
-	/*
-		if c.Bool("hostfile") == true {
-			parseMultipleFiles(con, c.Args().First(), parseOneXmlFile)
-		} else {
-			parseOneXmlFile(con)
-		}
-	*/
+	parseAllXmlData(c.Args().First())
 }
