@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 )
@@ -57,57 +56,30 @@ func workerPool(workerPoolSize int) {
 	}
 }
 
+// Call all commands to execute
 func worker() {
 	var s *Scan
-	var err error
-	var cmd *exec.Cmd
 	for {
 		s = <-ch_scan
 		log.Printf("Received Work : %v\n", s.Host)
-		s.Status = icmp_in_progress
-		// do the ping
-		cmd = exec.Command("/bin/ping", "-c", "2", s.Host)
-		s.Result.Icmp, err = cmd.Output()
-		if err != nil {
-			log.Printf("Failed to ping destination %s: %s", s.Host, err)
-			s.Result.Icmp = []byte("Failed")
+		// Call ping command
+		if s.Status < icmp_done {
+			s.DoPing()
 		}
-		s.Status = nmap_in_progress
-		log.Printf("Ping done for %v\n", s.Host)
-		// Prepare « nmap » command and call
-		cmd = exec.Command("nmap",
-			"-n",
-			"-T3",
-			"-sS",
-			"-sV",
-			"-oX", "-",
-			"--verbose",
-			"-p -",
-			s.Host)
-		result := make(chan []byte)
-		ticker := time.Tick(notification_delay)
-		// There is a goroutine to handle long treatment
-		// this is used to keep monitoring of « nmap » activity
-		go func() {
-			tmp, err := cmd.Output()
-			if err != nil {
-				log.Printf("Failed to nmap destination %s: %s", s.Host, err)
-			}
-			result <- tmp
-		}()
-		for end := false; !end; {
-			select {
-			case s.Result.Nmap = <-result:
-				s.Status = finished
-				log.Printf("Finished Work for %v\n", s.Host)
-				mutex.Lock()
-				scans.Save(database_file)
-				mutex.Unlock()
-				end = true
-			case <-ticker:
-				log.Printf("Work in progress for %v\n", s.Host)
-			}
+
+		// Call nmap command if not already done
+		if s.Status < nmap_done {
+			s.DoNmap()
 		}
+
+		if s.Status == nmap_done {
+			s.Status = finished
+		}
+
+		// Write data to file
+		mutex.Lock()
+		scans.Save(database_file)
+		mutex.Unlock()
 	}
 }
 
@@ -162,6 +134,30 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
+func report_status() {
+	ticker := time.Tick(notification_delay)
+	for {
+		var err bool = false
+		<-ticker
+		// make a copy of scans to avoid modification
+		for _, scan := range scans {
+			switch {
+			case scan.Status == null:
+				break
+			case scan.Status == icmp_failed || scan.Status == nmap_failed:
+				err = true
+			case scan.Status == icmp_in_progress:
+				log.Println("Icmp work in progress on host:", scan.Host)
+			case scan.Status < nmap_in_progress:
+				log.Println("Nmap work in progress on host:", scan.Host)
+			}
+		}
+		if err {
+			fmt.Println("Attention, des erreurs ont été détectée, Veuillez relancer « gans run »")
+		}
+	}
+}
+
 func runScan(c *cli.Context) {
 	// Check for root now, better solution has to be found
 	if os.Geteuid() != 0 {
@@ -190,6 +186,8 @@ func runScan(c *cli.Context) {
 			ch_scan <- &scans[i]
 		}
 	}
+
+	go report_status()
 
 	// écoute des connexions réseau :
 	listenGansScan(c.String("listen"))
