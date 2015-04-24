@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 )
@@ -57,61 +56,25 @@ func workerPool(workerPoolSize int) {
 	}
 }
 
-func ping(s *Scan) {
-	cmd := exec.Command("/bin/ping", "-c", "2", s.Host)
-	var err error
-	s.Result.Icmp, err = cmd.Output()
-	if err != nil {
-		log.Printf("Failed to ping destination %s: %s", s.Host, err)
-		s.Result.Icmp = []byte("Failed")
-	}
-	s.Status = nmap_in_progress
-	log.Printf("Ping done for %v\n", s.Host)
-}
-
+// Call all commands to execute
 func worker() {
 	var s *Scan
-	var cmd *exec.Cmd
 	for {
 		s = <-ch_scan
 		log.Printf("Received Work : %v\n", s.Host)
-		s.Status = icmp_in_progress
-		ping(s)
-		// Prepare « nmap » command and call
-		cmd = exec.Command("nmap",
-			"-n",
-			"-T3",
-			"-sS",
-			"-sV",
-			"-oX", "-",
-			"--verbose",
-			"-p -",
-			s.Host)
-		result := make(chan []byte)
-		ticker := time.Tick(notification_delay)
-		// There is a goroutine to handle long treatment
-		// this is used to keep monitoring of « nmap » activity
-		go func() {
-			tmp, err := cmd.Output()
-			if err != nil {
-				log.Printf("Failed to nmap destination %s: %s", s.Host, err)
-			}
-			result <- tmp
-		}()
-		for end := false; !end; {
-			select {
-			case s.Result.Nmap = <-result:
-				s.Status = finished
-				log.Printf("Finished Work for %v\n", s.Host)
-				mutex.Lock()
-				scans.Save(database_file)
-				mutex.Unlock()
-				end = true
-			case <-ticker:
-				log.Printf("Work in progress for %v\n", s.Host)
-			}
+		// Call ping command
+		if s.Status < icmp_done {
+			s.DoPing()
 		}
-		s.Status = finished
+
+		// Call nmap command if not already done
+		if s.Status < nmap_done {
+			s.DoNmap()
+		}
+
+		if s.Status == nmap_done {
+			s.Status = finished
+		}
 	}
 }
 
