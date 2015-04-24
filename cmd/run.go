@@ -137,17 +137,23 @@ func handleConnection(conn net.Conn) {
 func report_status() {
 	ticker := time.Tick(notification_delay)
 	for {
+		var err bool = false
 		<-ticker
 		// make a copy of scans to avoid modification
 		for _, scan := range scans {
 			switch {
 			case scan.Status == null:
 				break
-			case scan.Status < icmp_done:
+			case scan.Status == icmp_failed || scan.Status == nmap_failed:
+				err = true
+			case scan.Status == icmp_in_progress:
 				log.Println("Icmp work in progress on host:", scan.Host)
-			case scan.Status < nmap_done:
+			case scan.Status < nmap_in_progress:
 				log.Println("Nmap work in progress on host:", scan.Host)
 			}
+		}
+		if err {
+			fmt.Println("Attention, des erreurs ont été détectée, Veuillez relancer « gans run »")
 		}
 	}
 }
