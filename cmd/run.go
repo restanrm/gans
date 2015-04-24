@@ -75,6 +75,11 @@ func worker() {
 		if s.Status == nmap_done {
 			s.Status = finished
 		}
+
+		// Write data to file
+		mutex.Lock()
+		scans.Save(database_file)
+		mutex.Unlock()
 	}
 }
 
@@ -129,6 +134,24 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
+func report_status() {
+	ticker := time.Tick(notification_delay)
+	for {
+		<-ticker
+		// make a copy of scans to avoid modification
+		for _, scan := range scans {
+			switch {
+			case scan.Status == null:
+				break
+			case scan.Status < icmp_done:
+				log.Println("Icmp work in progress on host:", scan.Host)
+			case scan.Status < nmap_done:
+				log.Println("Nmap work in progress on host:", scan.Host)
+			}
+		}
+	}
+}
+
 func runScan(c *cli.Context) {
 	// Check for root now, better solution has to be found
 	if os.Geteuid() != 0 {
@@ -157,6 +180,8 @@ func runScan(c *cli.Context) {
 			ch_scan <- &scans[i]
 		}
 	}
+
+	go report_status()
 
 	// écoute des connexions réseau :
 	listenGansScan(c.String("listen"))

@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"time"
 )
 
 const (
@@ -59,32 +58,14 @@ func (s *Scan) DoNmap() {
 		"--verbose",
 		"-p -",
 		s.Host)
-	result := make(chan []byte)
-	ticker := time.Tick(notification_delay)
-	// There is a goroutine to handle long treatment
-	// this is used to keep monitoring of « nmap » activity
-	go func() {
-		tmp, err := cmd.Output()
-		if err != nil {
-			log.Printf("Failed to nmap destination %s: %s", s.Host, err)
-			s.Status = nmap_failed
-		}
-		result <- tmp
-	}()
-	for end := false; !end; {
-		select {
-		case s.Result.Nmap = <-result:
-			if s.Status != nmap_failed {
-				s.Status = nmap_done
-			}
-			log.Printf("Finished Work for %v\n", s.Host)
-			mutex.Lock()
-			scans.Save(database_file)
-			mutex.Unlock()
-			end = true
-		case <-ticker:
-			log.Printf("Work in progress for %v\n", s.Host)
-		}
+	res, err := cmd.Output()
+	s.Result.Nmap = res
+	if err != nil {
+		log.Printf("Failed to nmap destination %s: %s", s.Host, err)
+		s.Status = nmap_failed
+	} else {
+		log.Printf("Finished Work for %v\n", s.Host)
+		s.Status = nmap_done
 	}
 }
 
