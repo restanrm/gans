@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 )
 
 const (
@@ -83,21 +84,19 @@ type Scans []Scan
 // save all scan structure to filepath in JSON format
 func (s *Scans) Save(filepath string) error {
 	var err error
-	file, err := os.Create(filepath)
+	var backup_path string = path.Clean("." + filepath)
+	file, err := os.Create(backup_path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 	enc := json.NewEncoder(file)
-	/*
-		for scan := range s {
-			err = enc.Encode(scan)
-			if err != nil {
-				return err
-			}
-		}
-	*/
 	enc.Encode(s)
+	file.Close()
+	err = os.Rename(backup_path, filepath)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
