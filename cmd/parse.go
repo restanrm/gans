@@ -63,7 +63,11 @@ type Port struct {
 }
 
 func (p Port) String() string {
-	return fmt.Sprintf("  %-6v: %v; %v, %v\n", p.Number, p.Status, p.Protocol, p.Service)
+	// affiche le résultat si le port est ouvert.
+	if p.Status == "open" {
+		return fmt.Sprintf("  %-6v: %v; %v, %v\n", p.Number, p.Status, p.Protocol, p.Service)
+	}
+	return ""
 }
 
 type Host struct {
@@ -75,7 +79,7 @@ type Host struct {
 
 func (h Host) String() string {
 	var out string = ""
-	out = fmt.Sprintf("%v: %v\n", h.Address, h.Status)
+	out = fmt.Sprintf("%v: %v - %v\n", h.Address, h.Status, h.Os)
 	for _, port := range h.Ports {
 		out += port.String()
 	}
