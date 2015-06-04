@@ -52,10 +52,10 @@ func (s *Scan) DoNmap() {
 	s.Status = nmap_in_progress
 	cmd := exec.Command("nmap",
 		"-n",
-		"-T3",       // Temporisation 3 moyen (0 lent, 5 rapide)
-		"-sS",       // SYN scan
-		"-sV",       // Detection de version
-		"-oX -",     // Sortie en XML
+		"-T3",      // Temporisation 3 moyen (0 lent, 5 rapide)
+		"-sS",      // SYN scan
+		"-sV",      // Detection de version
+		"-oX", "-", // Sortie en XML
 		"--verbose", // Plus de verbosité
 		"-O",        // Detection de l'OS
 		"-p -",      // Tous les ports réseau
