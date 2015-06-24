@@ -41,7 +41,7 @@ Here is the first one : (it needs root because it interacts with nmap)
 
 > sudo ./gans run -d data.json
 
-This deamon is now waiting for commands.
+This deamon is now waiting for commands. It will read/write the infos it gathers/needs in the data.json file. (you can change this of course)
 
 Here is how to specify which ip to scan, open a new terminal and in the same directory :
 
