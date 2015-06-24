@@ -1,6 +1,8 @@
 README
 ======
 
+GANS is a tool to automate nmap scan
+
 Install GO
 ----------
 
@@ -21,5 +23,14 @@ unpack it under /usr/local/
 Install GANS
 ------------
 
+
+> go get github.com/restanrm/gans
+
+It will download all the dependencies needed.
+
+> cd ~/go
+
+Using GANS
+----------
 
 
