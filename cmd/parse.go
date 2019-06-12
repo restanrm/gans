@@ -5,10 +5,11 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"log"
+
 	"github.com/codegangsta/cli"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/restanrm/gans/nmap"
-	"log"
 	//"net"
 	"strconv"
 	"strings"
@@ -28,7 +29,7 @@ var CmdParse = cli.Command{
 		cli.StringFlag{
 			Name:  "password, p",
 			Usage: "Mot de passe de connection à la base de données",
-			Value: "amossys35;",
+			Value: "defaultPassword",
 		},
 		cli.StringFlag{
 			Name:  "database, d",
