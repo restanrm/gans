@@ -3,12 +3,13 @@ package cmd
 import (
 	"bufio"
 	"encoding/gob"
-	"github.com/codegangsta/cli"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"regexp"
+
+	"github.com/codegangsta/cli"
 )
 
 var CmdScan = cli.Command{
@@ -48,7 +49,7 @@ func filter_nmap_list_command(b []byte) []string {
 			inlist = append(inlist, "")
 		}
 	}
-	inlist = inlist[2 : len(inlist)-2]
+	inlist = inlist[1 : len(inlist)-2]
 	for _, line := range inlist {
 		res := reg.FindStringSubmatch(line)
 		if res != nil {
